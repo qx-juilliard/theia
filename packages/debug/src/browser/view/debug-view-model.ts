@@ -22,6 +22,8 @@ import { DebugSessionManager } from '../debug-session-manager';
 import { DebugThread } from '../model/debug-thread';
 import { DebugStackFrame } from '../model/debug-stack-frame';
 import { DebugBreakpoint } from '../model/debug-breakpoint';
+import { DebugWatchExpression } from './debug-watch-expression';
+import debounce from 'p-debounce';
 
 export const DebugViewOptions = Symbol('DebugViewOptions');
 export interface DebugViewOptions {
@@ -41,6 +43,15 @@ export class DebugViewModel implements Disposable {
     readonly onDidChangeBreakpoints: Event<URI> = this.onDidChangeBreakpointsEmitter.event;
     protected fireDidChangeBreakpoints(uri: URI): void {
         this.onDidChangeBreakpointsEmitter.fire(uri);
+    }
+
+    // TODO restore between sessions
+    protected readonly _watchExpressions: DebugWatchExpression[] = [];
+
+    protected readonly onDidChangeWatchExpressionsEmitter = new Emitter<void>();
+    readonly onDidChangeWatchExpressions = this.onDidChangeWatchExpressionsEmitter.event;
+    protected fireDidChangeWatchExpressions(): void {
+        this.onDidChangeWatchExpressionsEmitter.fire(undefined);
     }
 
     protected readonly toDispose = new DisposableCollection(
@@ -100,7 +111,8 @@ export class DebugViewModel implements Disposable {
             }
         }));
         this.toDispose.push(this.manager.onDidChange(current => {
-            if (this.has(current)) {
+            if (!current || this.has(current)) {
+                this.refreshWatchExpressions();
                 this.fireDidChange();
             }
         }));
@@ -165,5 +177,52 @@ export class DebugViewModel implements Disposable {
         }
         this.fireDidChange();
     }
+
+    get watchExpressions(): DebugWatchExpression[] {
+        return this._watchExpressions;
+    }
+
+    async addWatchExpression(expression: string = ''): Promise<DebugWatchExpression | undefined> {
+        const watchExpression = new DebugWatchExpression({
+            expression,
+            session: () => this.manager.currentSession,
+            onDidChange: () => this.fireDidChangeWatchExpressions()
+        });
+        await watchExpression.open();
+        if (!watchExpression.expression) {
+            return undefined;
+        }
+        this._watchExpressions.push(watchExpression);
+        this.fireDidChangeWatchExpressions();
+        return watchExpression;
+    }
+
+    removeWatchExpressions(): void {
+        if (this._watchExpressions.length) {
+            this._watchExpressions.length = 0;
+            this.fireDidChangeWatchExpressions();
+        }
+    }
+
+    removeWatchExpression(expression: DebugWatchExpression): void {
+        const index = this._watchExpressions.indexOf(expression);
+        if (index !== -1) {
+            this._watchExpressions.splice(index, 1);
+            this.fireDidChangeWatchExpressions();
+        }
+    }
+
+    protected refreshWatchExpressionsQueue = Promise.resolve();
+    protected refreshWatchExpressions = debounce(() => {
+        this.refreshWatchExpressionsQueue = this.refreshWatchExpressionsQueue.then(async () => {
+            try {
+                for (const watchExpression of this._watchExpressions) {
+                    await watchExpression.evaluate();
+                }
+            } catch (e) {
+                console.error('Failed to refresh watch expressions: ', e);
+            }
+        });
+    }, 50);
 
 }

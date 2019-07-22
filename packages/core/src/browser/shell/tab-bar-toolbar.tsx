@@ -128,8 +128,9 @@ export class TabBarToolbar extends ReactWidget {
         if (iconClass) {
             classNames.push(iconClass);
         }
+        const tooltip = item.tooltip || (command && command.label);
         return <div key={item.id} className={`${TabBarToolbar.Styles.TAB_BAR_TOOLBAR_ITEM}${command && this.commandIsEnabled(command.id) ? ' enabled' : ''}`} >
-            <div id={item.id} className={classNames.join(' ')} onClick={this.executeCommand} title={item.tooltip}>{innerText}</div>
+            <div id={item.id} className={classNames.join(' ')} onClick={this.executeCommand} title={tooltip}>{innerText}</div>
         </div>;
     }
 
