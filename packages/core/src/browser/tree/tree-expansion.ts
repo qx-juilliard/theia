@@ -85,15 +85,7 @@ export class TreeExpansionServiceImpl implements TreeExpansionService {
     protected readonly onExpansionChangedEmitter = new Emitter<ExpandableTreeNode>();
 
     @postConstruct()
-    protected init(): void {
-        this.tree.onNodeRefreshed(node => {
-            for (const child of node.children) {
-                if (ExpandableTreeNode.isExpanded(child)) {
-                    this.tree.refresh(child);
-                }
-            }
-        });
-    }
+    protected init(): void { }
 
     dispose() {
         this.onExpansionChangedEmitter.dispose();

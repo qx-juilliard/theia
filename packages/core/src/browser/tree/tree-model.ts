@@ -211,6 +211,14 @@ export class TreeModelImpl implements TreeModel, SelectionProvider<ReadonlyArray
         } else {
             await this.tree.refresh();
         }
+        const node = parent || this.root;
+        if (CompositeTreeNode.is(node)) {
+            for (const child of node.children) {
+                if (ExpandableTreeNode.isExpanded(child)) {
+                    await this.refresh(child);
+                }
+            }
+        }
     }
 
     get selectedNodes() {
